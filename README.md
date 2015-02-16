@@ -1,6 +1,43 @@
 # Ddp::Server::Rethinkdb
 
-TODO: Write a gem description
+So the idea of this is that you can create a class that exposes an interface to your RethinkDB collections and have it be served over DDP.
+
+Ideally it would look something like this:
+
+```
+class MyRethinkDBAPI
+	
+
+	def initialize(config)
+		@connection_pool = ConnectionPool.new(
+			size:    config[:connection_pool_size],
+			timeout: config[:connection_pool_timeout]
+			) do
+				RethinkDB::Connection.new(
+					host: config[:host],
+					port: config[:port]
+				)
+		end
+		@database_name = config[:database]
+	end
+
+	private
+	def table(name)
+		database.table(name)
+	end
+
+	def database
+		RethinkDB::RQL.new.db(@database_name)
+	end
+
+	def with_connection
+		@connection_pool.with do |conn|
+			yield conn
+		end
+	end
+end
+```
+
 
 ## Installation
 

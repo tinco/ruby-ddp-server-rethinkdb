@@ -1,41 +1,35 @@
-# Ddp::Server::Rethinkdb
+# DDP::Server::RethinkDB
 
 So the idea of this is that you can create a class that exposes an interface to your RethinkDB collections and have it be served over DDP.
 
 Ideally it would look something like this:
 
 ```
-class MyRethinkDBAPI
-	
-
-	def initialize(config)
-		@connection_pool = ConnectionPool.new(
-			size:    config[:connection_pool_size],
-			timeout: config[:connection_pool_timeout]
-			) do
-				RethinkDB::Connection.new(
-					host: config[:host],
-					port: config[:port]
-				)
+class MyRethinkDBAPI < DDP:Server::RethinkDB::API
+	module Collections
+		def messages
+			table('messages')
 		end
-		@database_name = config[:database]
 	end
 
-	private
-	def table(name)
-		database.table(name)
+	def initialize
+		@name = "Guest#{rand(10..100)}"
 	end
 
-	def database
-		RethinkDB::RQL.new.db(@database_name)
-	end
-
-	def with_connection
-		@connection_pool.with do |conn|
-			yield conn
-		end
+	def send_message(message)
+		table('messages').insert(from: @name, message: message)
 	end
 end
+
+config = {
+	connection_pool_size: 8,
+	connection_pool_timeout: 5,
+	host: 'localhost',
+	port: 28_015,
+	database: 'message'
+}
+
+DDP::Server::RethinkDB.rack(config, MyRethinkDBAPI).run
 ```
 
 

@@ -5,7 +5,7 @@ So the idea of this is that you can create a class that exposes an interface to 
 Ideally it would look something like this:
 
 ```
-class MyRethinkDBAPI < DDP:Server::RethinkDB::API
+class Messager < DDP:Server::RethinkDB::API
 	module Collections
 		def messages
 			table('messages')
@@ -29,7 +29,7 @@ config = {
 	database: 'message'
 }
 
-DDP::Server::RethinkDB.rack(config, MyRethinkDBAPI).run
+DDP::Server::RethinkDB.rack(Messager, config).run
 ```
 
 

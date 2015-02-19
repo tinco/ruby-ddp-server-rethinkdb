@@ -21,25 +21,27 @@ module DDP
 					collections_module = api_class.const_get :Collections
 					@collections = collections_module.instance_methods.map(&:to_s)
 					@api = api_class.new(config)
+					@api.singleton_class.include collections_module
 					@subscriptions = {}
 				end
 
 				def handle_sub(id, name, params)
-					send_nosub(id, error: 'No such collection') unless @collections.include? name
-					query = api.send(name, params)
+					params ||= []
+					return send_nosub(id, error: 'No such collection') unless @collections.include? name
+					query = api.send(name, *params)
 					@subscriptions[id] = Subscription.new(self, id, name, query)
 				end
 
 				def subscription_update(id, change)
 					subscription_name = @subscriptions[id].name
-					old_value = change[:old_value]
-					new_value = change[:new_value]
+					old_value = change['old_val']
+					new_value = change['new_val']
 
-					return send_added(subscription_name, new_value[:id], new_value) if old_value.nil?
-					return send_removed(subscription_name, old_value[:id]) if new_value.nil?
+					return send_added(subscription_name, new_value['id'], new_value) if old_value.nil?
+					return send_removed(subscription_name, old_value['id']) if new_value.nil?
 
 					cleared = old_value.keys.reject { |key| new_value.include? key }
-					send_changed(subscription.name, old_value[:id], new_value, cleared)
+					send_changed(subscription.name, old_value['id'], new_value, cleared)
 				end
 
 				def handle_unsub(id)
@@ -49,7 +51,8 @@ module DDP
 				end
 
 				def handle_method(id, method, params)
-					result = @api.send(method, params)
+					params ||= []
+					result = @api.send(method, *params)
 					send_result(id, result)
 				rescue => e
 					send_error_result(id, e)
@@ -90,20 +93,20 @@ module DDP
 			# Actor that asynchronously monitors a collection
 			class Subscription
 				include Celluloid
+				include Celluloid::Logger
 
 				attr_reader :name, :stopped
 
 				def initialize(listener, id, name, query)
 					@stopped = false
 					@name = name
-
 					async.read_loop(listener, query, id)
 				end
 
 				def read_loop(listener, query, id)
 					listener.api.with_connection do |conn|
 						query.changes.run(conn).each do |change|
-							listener.update_subscription(id, change)
+							listener.subscription_update(id, change)
 							break if stopped?
 						end
 					end
@@ -111,6 +114,10 @@ module DDP
 
 				def stop
 					@stopped = true
+				end
+
+				def stopped?
+					@stopped
 				end
 			end
 		end

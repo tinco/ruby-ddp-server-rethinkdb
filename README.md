@@ -5,19 +5,25 @@ So the idea of this is that you can create a class that exposes an interface to 
 Ideally it would look something like this:
 
 ```
-class Messager < DDP:Server::RethinkDB::API
+require 'ddp/server/rethinkdb'
+
+class Messager < DDP::Server::RethinkDB::API
+	include Celluloid::Logger
+
 	module Collections
 		def messages
 			table('messages')
 		end
 	end
 
-	def initialize
-		@name = "Guest#{rand(10..100)}"
+	def name
+		@name ||= "Guest#{rand(10..100)}"
 	end
 
 	def send_message(message)
-		table('messages').insert(from: @name, message: message)
+		with_connection do |conn|
+			table('messages').insert(from: name, message: message).run(conn)
+		end
 	end
 end
 
@@ -29,9 +35,8 @@ config = {
 	database: 'message'
 }
 
-DDP::Server::RethinkDB.rack(Messager, config).run
+run DDP::Server::RethinkDB::WebSocket.rack(Messager, config)
 ```
-
 
 ## Installation
 

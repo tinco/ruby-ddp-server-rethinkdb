@@ -1,5 +1,7 @@
+require 'ddp/server'
 require 'ddp/server/rethinkdb/version'
-require ''
+require 'rethinkdb'
+require 'connection_pool'
 
 module DDP
 	module Server
@@ -7,9 +9,11 @@ module DDP
 		module RethinkDB
 			# Implementation of the WebSocket DDP::Server
 			class WebSocket < DDP::Server::WebSocket
+				include Celluloid::Logger
+
 				attr_reader :api
 
-				def self.rack(api, config, pool_config)
+				def self.rack(api, config, pool_config={})
 					super(pool_config.merge(args: [api, config]))
 				end
 
@@ -45,14 +49,10 @@ module DDP
 				end
 
 				def handle_method(id, method, params)
-					async do
-						begin
-							result = @api.send(method, params)
-							send_result(id, result)
-						rescue => e
-							send_error_result(id, e)
-						end
-					end
+					result = @api.send(method, params)
+					send_result(id, result)
+				rescue => e
+					send_error_result(id, e)
 				end
 			end
 
@@ -61,19 +61,19 @@ module DDP
 			class API
 				def initialize(config)
 					@connection_pool = ConnectionPool.new(
-						size:    config['connection_pool_size'],
-						timeout: config['connection_pool_timeout']
+						size:    config[:connection_pool_size],
+						timeout: config[:connection_pool_timeout]
 					) do
-						RethinkDB::Connection.new(
-							host: config['host'],
-							port: config['port']
+						::RethinkDB::Connection.new(
+							host: config[:host],
+							port: config[:port]
 						)
 					end
-					@database_name = config['database']
+					@database_name = config[:database]
 				end
 
 				def database
-					RethinkDB::RQL.new.db(@database_name)
+					::RethinkDB::RQL.new.db(@database_name)
 				end
 
 				def table(name)

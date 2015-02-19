@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
 	spec.email         = ['mail@tinco.nl']
 	spec.summary       = 'Write a DDP RethinkDB service using Ruby.'
 	spec.description   = 'Write a DDP RethinkDB service using Ruby.'
-	spec.homepage      = ''
+	spec.homepage      = 'https://github.com/d-snp/ruby-ddp-server-rethinkdb'
 	spec.license       = 'MIT'
 
 	spec.files         = `git ls-files -z`.split("\x0")
@@ -21,5 +21,7 @@ Gem::Specification.new do |spec|
 	spec.add_development_dependency 'bundler', '~> 1.6'
 	spec.add_development_dependency 'rake'
 
-	spec.add_dependency 'ddp-server'
+	spec.add_dependency 'ddp-server', '>= 0.0.3'
+	spec.add_dependency 'rethinkdb'
+	spec.add_dependency 'connection_pool'
 end

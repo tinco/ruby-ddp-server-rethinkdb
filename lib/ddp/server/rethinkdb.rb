@@ -5,6 +5,7 @@ module DDP
 	module Server
 		# A RethinkDB DDP Server
 		module RethinkDB
+			# Implementation of the WebSocket DDP::Server
 			class WebSocket < DDP::Server::WebSocket
 				attr_reader :api
 
@@ -14,32 +15,27 @@ module DDP
 
 				def initialize(api_class, config)
 					collections_module = api_class.const_get :Collections
-					@collections = @collections_module.instance_methods.map(&:to_s)
+					@collections = collections_module.instance_methods.map(&:to_s)
 					@api = api_class.new(config)
 					@subscriptions = {}
 				end
 
 				def handle_sub(id, name, params)
-					if @collections.include? name
-						query = api.send(name)
-						@subscriptions[id] = Subscription.new(self, id, name, query)
-					end
+					send_nosub(id, error: 'No such collection') unless @collections.include? name
+					query = api.send(name, params)
+					@subscriptions[id] = Subscription.new(self, id, name, query)
 				end
 
 				def subscription_update(id, change)
-					subscription = @subscriptions[id]
-
+					subscription_name = @subscriptions[id].name
 					old_value = change[:old_value]
 					new_value = change[:new_value]
 
-					if old_value.nil?
-						send_added(subscription.name, change[:new_value][:id], change[:new_value])
-					elsif new_value.nil?
-						send_removed(subscription.name, change[:old_value][:id])
-					else
-						cleared = old_value.keys.reject {|key| new_value.include? key }
-						send_changed(subscription.name, change[:old_value][:id], change[:new_value], cleared)
-					end
+					return send_added(subscription_name, new_value[:id], new_value) if old_value.nil?
+					return send_removed(subscription_name, old_value[:id]) if new_value.nil?
+
+					cleared = old_value.keys.reject { |key| new_value.include? key }
+					send_changed(subscription.name, old_value[:id], new_value, cleared)
 				end
 
 				def handle_unsub(id)
@@ -50,14 +46,18 @@ module DDP
 
 				def handle_method(id, method, params)
 					async do
-						result = @api.send(method, params)
-						send_result(id, result)
-					rescue => e
-						send_error_result(id, e)
+						begin
+							result = @api.send(method, params)
+							send_result(id, result)
+						rescue => e
+							send_error_result(id, e)
+						end
 					end
 				end
 			end
 
+			# Helper class that users can extend to implement an API that can be passed
+			# as the RPC API parameter to the RethinkDB DDP protocol
 			class API
 				def initialize(config)
 					@connection_pool = ConnectionPool.new(
@@ -87,10 +87,11 @@ module DDP
 				end
 			end
 
+			# Actor that asynchronously monitors a collection
 			class Subscription
 				include Celluloid
 
-				attr_reader :name
+				attr_reader :name, :stopped
 
 				def initialize(listener, id, name, query)
 					@stopped = false
@@ -101,7 +102,7 @@ module DDP
 
 				def read_loop(listener, query, id)
 					listener.api.with_connection do |conn|
-						query.changes().run(conn).each do |change|
+						query.changes.run(conn).each do |change|
 							listener.update_subscription(id, change)
 							break if stopped?
 						end
@@ -110,10 +111,6 @@ module DDP
 
 				def stop
 					@stopped = true
-				end
-
-				def stopped?
-					@stop
 				end
 			end
 		end

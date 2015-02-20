@@ -16,14 +16,16 @@ class Messager < DDP::Server::RethinkDB::API
 		end
 	end
 
-	def name
-		@name ||= "Guest#{rand(10..100)}"
+	module RPC
+		def send_message(message)
+			with_connection do |conn|
+				table('messages').insert(from: name, message: message).run(conn)
+			end
+		end
 	end
 
-	def send_message(message)
-		with_connection do |conn|
-			table('messages').insert(from: name, message: message).run(conn)
-		end
+	def name
+		@name ||= "Guest#{rand(10..100)}"
 	end
 end
 
@@ -36,6 +38,7 @@ config = {
 }
 
 run DDP::Server::RethinkDB::WebSocket.rack(Messager, config)
+
 ```
 
 ## Installation

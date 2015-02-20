@@ -13,15 +13,18 @@ module DDP
 
 				attr_reader :api
 
-				def self.rack(api, config, pool_config={})
+				def self.rack(api, config, pool_config = {})
 					super(pool_config.merge(args: [api, config]))
 				end
 
 				def initialize(api_class, config)
 					collections_module = api_class.const_get :Collections
+					rpc_module = api_class.const_get :RPC
 					@collections = collections_module.instance_methods.map(&:to_s)
+					@rpc_methods = rpc_module.instance_methods.map(&:to_s)
 					@api = api_class.new(config)
 					@api.singleton_class.include collections_module
+					@api.singleton_class.include rpc_module
 					@subscriptions = {}
 				end
 
@@ -52,6 +55,7 @@ module DDP
 
 				def handle_method(id, method, params)
 					params ||= []
+					raise 'No such method' unless @rpc_methods.include? method
 					result = @api.send(method, *params)
 					send_result(id, result)
 				rescue => e
@@ -96,6 +100,7 @@ module DDP
 				include Celluloid::Logger
 
 				attr_reader :name, :stopped
+				alias_method :stopped?, :stopped
 
 				def initialize(listener, id, name, query)
 					@stopped = false
@@ -114,10 +119,6 @@ module DDP
 
 				def stop
 					@stopped = true
-				end
-
-				def stopped?
-					@stopped
 				end
 			end
 		end

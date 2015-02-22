@@ -18,21 +18,16 @@ module DDP
 				end
 
 				def initialize(api_class, config)
-					collections_module = api_class.const_get :Collections
-					rpc_module = api_class.const_get :RPC
-					@collections = collections_module.instance_methods.map(&:to_s)
-					@rpc_methods = rpc_module.instance_methods.map(&:to_s)
 					@api = api_class.new(config)
-					@api.singleton_class.include collections_module
-					@api.singleton_class.include rpc_module
 					@subscriptions = {}
 				end
 
 				def handle_sub(id, name, params)
 					params ||= []
-					return send_nosub(id, error: 'No such collection') unless @collections.include? name
-					query = api.send(name, *params)
+					query = @api.collection_query(name, *params)
 					@subscriptions[id] = Subscription.new(self, id, name, query)
+				rescue => e
+					send_error_result(id, e)
 				end
 
 				def subscription_update(id, change)
@@ -55,8 +50,7 @@ module DDP
 
 				def handle_method(id, method, params)
 					params ||= []
-					raise 'No such method' unless @rpc_methods.include? method
-					result = @api.send(method, *params)
+					result = @api.invoke_rpc(method, *params)
 					send_result(id, result)
 				rescue => e
 					send_error_result(id, e)
@@ -67,16 +61,22 @@ module DDP
 			# as the RPC API parameter to the RethinkDB DDP protocol
 			class API
 				def initialize(config)
-					@connection_pool = ConnectionPool.new(
-						size:    config[:connection_pool_size],
-						timeout: config[:connection_pool_timeout]
-					) do
-						::RethinkDB::Connection.new(
-							host: config[:host],
-							port: config[:port]
-						)
-					end
+					setup_connection_pool(config)
+
 					@database_name = config[:database]
+
+					setup_rpc
+					setup_collections
+				end
+
+				def invoke_rpc(method, *params)
+					raise 'No such method' unless @rpc_methods.include? method
+					send(method, *params)
+				end
+
+				def collection_query(name, *params)
+					raise 'No such collection' unless @collections.include? name
+					send(name, *params)
 				end
 
 				def database
@@ -92,12 +92,37 @@ module DDP
 						yield conn
 					end
 				end
+
+				private
+
+				def setup_connection_pool(config)
+					@connection_pool = ConnectionPool.new(
+						size:    config[:connection_pool_size],
+						timeout: config[:connection_pool_timeout]
+					) do
+						::RethinkDB::Connection.new(
+							host: config[:host],
+							port: config[:port]
+						)
+					end
+				end
+
+				def setup_rpc
+					rpc_module = self.class.const_get :RPC
+					@rpc_methods = rpc_module.instance_methods.map(&:to_s)
+					singleton_class.include rpc_module
+				end
+
+				def setup_collections
+					collections_module = self.class.const_get :Collections
+					@collections = collections_module.instance_methods.map(&:to_s)
+					singleton_class.include collections_module
+				end
 			end
 
 			# Actor that asynchronously monitors a collection
 			class Subscription
 				include Celluloid
-				include Celluloid::Logger
 
 				attr_reader :name, :stopped
 				alias_method :stopped?, :stopped

@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
 	spec.add_development_dependency 'bundler', '~> 1.6'
 	spec.add_development_dependency 'rake'
 
-	spec.add_dependency 'ddp-server', '>= 0.0.3'
+	spec.add_dependency 'ddp-server', '>= 0.0.4'
 	spec.add_dependency 'rethinkdb'
 	spec.add_dependency 'connection_pool'
 end

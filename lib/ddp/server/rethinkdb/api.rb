@@ -5,11 +5,13 @@ module DDP
 			# Helper class that users can extend to implement an API that can be passed
 			# as the RPC API parameter to the RethinkDB DDP protocol
 			class API
-				def initialize(config)
-					setup_connection_pool(config)
+				attr_accessor :database_name
 
+				def initialize(config)
+					@config = config
 					@database_name = config[:database]
 
+					setup_connection_pool
 					setup_rpc
 					setup_collections
 				end
@@ -38,17 +40,21 @@ module DDP
 					end
 				end
 
+				def new_connection
+					::RethinkDB::Connection.new(
+						host: @config[:host],
+						port: @config[:port]
+					)
+				end
+
 				private
 
-				def setup_connection_pool(config)
+				def setup_connection_pool
 					@connection_pool = ConnectionPool.new(
-						size:    config[:connection_pool_size],
-						timeout: config[:connection_pool_timeout]
+						size:    @config[:connection_pool_size],
+						timeout: @config[:connection_pool_timeout]
 					) do
-						::RethinkDB::Connection.new(
-							host: config[:host],
-							port: config[:port]
-						)
+						new_connection
 					end
 				end
 

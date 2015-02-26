@@ -15,11 +15,9 @@ module DDP
 				end
 
 				def read_loop(listener, query, id)
-					listener.api.with_connection do |conn|
-						query.changes.run(conn).each do |change|
-							listener.subscription_update(id, change)
-							break if stopped?
-						end
+					query.changes.run(listener.api.new_connection).each do |change|
+						listener.subscription_update(id, change)
+						break if stopped?
 					end
 				end
 

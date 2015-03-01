@@ -22,6 +22,7 @@ Gem::Specification.new do |spec|
 	spec.add_development_dependency 'rake'
 
 	spec.add_dependency 'ddp-server', '>= 0.0.4'
+	spec.add_dependency 'celluloid-websocket', '>= 0.0.9'
 	spec.add_dependency 'rethinkdb'
 	spec.add_dependency 'connection_pool'
 end

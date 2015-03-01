@@ -17,7 +17,15 @@ module DDP
 				def handle_sub(id, name, params)
 					params ||= []
 					query = @api.collection_query(name, *params)
+
+					# TODO: this should somehow be atomically executed so we dont have overlap.
 					@subscriptions[id] = Subscription.new(self, id, name, query)
+
+					@api.with_connection do |conn|
+						query.run(conn).each { |r| send_added(name, r['id'], r) }
+					end
+
+					send_ready([id])
 				rescue => e
 					send_error_result(id, e)
 				end

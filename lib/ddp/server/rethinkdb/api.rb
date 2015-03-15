@@ -23,7 +23,7 @@ module DDP
 
 				def collection_query(name, *params)
 					raise 'No such collection' unless @collections.include? name
-					send(name, *params)
+					wrap_query send(name, *params)
 				end
 
 				def database
@@ -68,6 +68,23 @@ module DDP
 					collections_module = self.class.const_get :Collections
 					@collections = collections_module.instance_methods.map(&:to_s)
 					singleton_class.include collections_module
+				end
+
+				def wrap_query(query)
+					lambda do |&on_update|
+						connection = new_connection
+						results = query.run(connection)
+						results.each { |r| on_update.({}, r['id'], r) }
+						wrap_changes(query, conn, on_update)
+					end	
+				end
+
+				def wrap_changes(query, conn, on_update)
+					query.run(conn).each do |change|
+						old_value = change['old_value']
+						new_value = change['new_value']
+						on_update.(old_value, new_value)
+					end
 				end
 			end
 		end

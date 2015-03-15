@@ -32,4 +32,4 @@ config = {
 	database: 'message'
 }
 
-run DDP::Server::RethinkDB::WebSocket.rack(Messager, config)
+run DDP::Server::WebSocket.rack(Messager, config)

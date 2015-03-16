@@ -74,16 +74,16 @@ module DDP
 					lambda do |&on_update|
 						connection = new_connection
 						results = query.run(connection)
-						results.each { |r| on_update.({}, r['id'], r) }
-						wrap_changes(query, conn, on_update)
-					end	
+						results.each { |r| on_update.call(nil, r) }
+						wrap_changes(query, connection, on_update)
+					end
 				end
 
 				def wrap_changes(query, conn, on_update)
-					query.run(conn).each do |change|
-						old_value = change['old_value']
-						new_value = change['new_value']
-						on_update.(old_value, new_value)
+					query.changes().run(conn).each do |change|
+						old_value = change['old_val']
+						new_value = change['new_val']
+						on_update.call(old_value, new_value)
 					end
 				end
 			end

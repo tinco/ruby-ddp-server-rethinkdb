@@ -4,8 +4,6 @@ require 'celluloid'
 require 'ddp/server'
 require 'ddp/server/rethinkdb'
 require 'ddp/server/rethinkdb/api'
-require 'ddp/server/rethinkdb/subscription'
-require 'ddp/server/rethinkdb/websocket'
 
 module DDP
 	module Server

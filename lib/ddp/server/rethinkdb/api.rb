@@ -5,6 +5,8 @@ module DDP
 			# Helper class that users can extend to implement an API that can be passed
 			# as the RPC API parameter to the RethinkDB DDP protocol
 			class API
+				include Helpers
+
 				attr_accessor :database_name
 
 				def initialize(config)
@@ -23,7 +25,7 @@ module DDP
 
 				def collection_query(name, *params)
 					raise 'No such collection' unless @collections.include? name
-					wrap_query send(name, *params)
+					wrap_query(send(name, *params), new_connection)
 				end
 
 				def database
@@ -68,23 +70,6 @@ module DDP
 					collections_module = self.class.const_get :Collections
 					@collections = collections_module.instance_methods.map(&:to_s)
 					singleton_class.include collections_module
-				end
-
-				def wrap_query(query)
-					lambda do |&on_update|
-						connection = new_connection
-						results = query.run(connection)
-						results.each { |r| on_update.call(nil, r) }
-						wrap_changes(query, connection, on_update)
-					end
-				end
-
-				def wrap_changes(query, conn, on_update)
-					query.changes().run(conn).each do |change|
-						old_value = change['old_val']
-						new_value = change['new_val']
-						on_update.call(old_value, new_value)
-					end
 				end
 			end
 		end

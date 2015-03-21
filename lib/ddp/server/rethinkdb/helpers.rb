@@ -5,7 +5,7 @@ module DDP
 			# Helper class that users can extend to implement an API that can be passed
 			# as the RPC API parameter to the RethinkDB DDP protocol
 			module Helpers
-				def wrap_query(query, connection)
+				def wrap_query(query)
 					lambda do |&on_update|
 						connection = new_connection
 						results = query.run(connection)

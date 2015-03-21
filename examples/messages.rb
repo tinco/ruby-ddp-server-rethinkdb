@@ -1,4 +1,5 @@
 require 'ddp/server/rethinkdb'
+require 'ddp/server/rethinkdb/api'
 
 # A simple messaging API
 class Messager < DDP::Server::RethinkDB::API
